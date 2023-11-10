@@ -101,6 +101,10 @@ class MusicListCubit extends Cubit<MusicListState> {
 
   Future<void> trimMusic({required MusicListLoadedState state, double? start, double? end}) async {
     await audioPlayer.setClip(start: Duration(seconds: start!.toInt()), end: Duration(seconds: end!.toInt()));
+    // Future.delayed(
+    //   Duration(seconds: 1),
+    //   () => ,
+    // );
     playMusic();
     emit(state.copyWith(startValue: start, endValue: end));
   }
@@ -119,9 +123,22 @@ class MusicListCubit extends Cubit<MusicListState> {
         audioPlayer.stop();
       }
     }
-    musicList.insert(
-      0,
-      MusicListData(
+    if (musicList[0].path == null) {
+      musicList.insert(
+        0,
+        MusicListData(
+          id: 0,
+          homeCategoryId: "0",
+          homeCategoryName: 'File',
+          musicName: filePicker.files.first.name,
+          musicFile: 'musicFile',
+          isAudioPlay: true,
+          audioDuration: Duration.zero,
+          path: filePath,
+        ),
+      );
+    } else {
+      musicList[0] = MusicListData(
         id: 0,
         homeCategoryId: "0",
         homeCategoryName: 'File',
@@ -130,8 +147,8 @@ class MusicListCubit extends Cubit<MusicListState> {
         isAudioPlay: true,
         audioDuration: Duration.zero,
         path: filePath,
-      ),
-    );
+      );
+    }
     genrateList();
     audioPlayer.setFilePath(filePath!);
     emit(state.copyWith(musicList: musicList, random: Random().nextDouble()));

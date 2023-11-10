@@ -202,17 +202,20 @@ abstract class AddMusicScreenWidget extends State<AddMusicScreen> {
                                 musicListCubit: musicListCubit,
                                 boxColor: allColor,
                                 callbackStart: (duration) {
+                                  // musicListCubit.audioPlayer.stop();
                                   musicListCubit.trimMusic(state: state, start: duration, end: state.endValue);
                                 },
                                 duration: state.totalDuration,
                                 callbackEnd: (duration) {
+                                  musicListCubit.audioPlayer.stop();
+
                                   musicListCubit.trimMusic(state: state, end: duration, start: state.startValue);
                                 },
                                 backgroundColor: Colors.white,
                                 heightWaveSlider: 10,
                                 widthWaveSlider: ScreenUtil().screenWidth - 80,
-                                trimLoadedState: trimState,
-                                trimCubit: trimCubit,
+                                // trimLoadedState: trimState,
+                                // trimCubit: trimCubit,
                               );
                             }
                             return const SizedBox.shrink();

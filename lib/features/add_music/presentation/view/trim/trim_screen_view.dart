@@ -1,8 +1,6 @@
-// ignore_for_file: unused_local_variable, deprecated_member_use
+import 'dart:math';
 
 import 'package:audio/features/add_music/presentation/cubit/music_list/music_list_cubit.dart';
-import 'package:audio/features/add_music/presentation/cubit/trim_cubit/trim_cubit.dart';
-import 'package:audio/features/add_music/presentation/cubit/trim_cubit/trim_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -13,36 +11,34 @@ class WaveSlider extends StatefulWidget {
   final double heightWaveSlider;
   final Color wavActiveColor;
   final Color wavDeactiveColor;
-  final Color boxColor;
+  final Color sliderColor;
   final Color backgroundColor;
   final Color positionTextColor;
   final double duration;
   final CallbackSelection callbackStart;
   final CallbackSelection callbackEnd;
-  final TrimLoadedState trimLoadedState;
-  final TrimCubit trimCubit;
   final MusicListCubit musicListCubit;
-  final Color barBackgroundColor;
-  final Color barColor;
-  final Color circleColor;
+  final Color? boxColor;
+  final MaterialColor? circleColor;
+  final Color? barColor;
+  final Color? barBackgroundColor;
   const WaveSlider({
     Key? key,
     required this.duration,
     required this.callbackStart,
-    required this.callbackEnd,
-    required this.trimLoadedState,
-    required this.trimCubit,
     required this.musicListCubit,
+    required this.callbackEnd,
     this.widthWaveSlider = 0,
     this.heightWaveSlider = 0,
     this.wavActiveColor = Colors.deepPurple,
     this.wavDeactiveColor = Colors.blueGrey,
-    this.boxColor = Colors.red,
+    this.sliderColor = Colors.red,
     this.backgroundColor = Colors.grey,
     this.positionTextColor = Colors.black,
-    this.barBackgroundColor = Colors.white,
-    this.barColor = Colors.blue,
-    this.circleColor = Colors.red,
+    this.boxColor,
+    this.circleColor,
+    this.barColor,
+    this.barBackgroundColor,
   }) : super(key: key);
 
   @override
@@ -50,18 +46,41 @@ class WaveSlider extends StatefulWidget {
 }
 
 class WaveSliderState extends State<WaveSlider> {
+  double widthSlider = 300;
+  double heightSlider = 100;
+  static const barWidth = 5.0;
+  static const selectBarWidth = 20.0;
+  double barStartPosition = 0.0;
+  double barEndPosition = 50;
+
   @override
   void initState() {
     super.initState();
 
-    var shortSize = MediaQueryData.fromView(WidgetsBinding.instance.window).size.shortestSide;
+    var shortSize = MediaQueryData.fromWindow(WidgetsBinding.instance.window).size.shortestSide;
 
-    widget.trimCubit.findBarEndPosition(
-      state: widget.trimLoadedState,
-      widthWaveSlider: widget.widthWaveSlider,
-      heightWaveSlider: widget.heightWaveSlider,
-      shortSize: shortSize,
-    );
+    widthSlider = (widget.widthWaveSlider < 50) ? (shortSize - 2 - 40) : widget.widthWaveSlider;
+    heightSlider = (widget.heightWaveSlider < 50) ? 100 : widget.heightWaveSlider;
+    barEndPosition = widthSlider - selectBarWidth;
+  }
+
+  double _getBarStartPosition() {
+    return ((barEndPosition) < barStartPosition) ? barEndPosition : barStartPosition;
+  }
+
+  double _getBarEndPosition() {
+    return ((barStartPosition + selectBarWidth) > barEndPosition)
+        ? (barStartPosition + selectBarWidth)
+        : barEndPosition;
+  }
+
+  int _getStartTime() {
+    // ignore: division_optimization
+    return (_getBarStartPosition() / (widthSlider / widget.duration)).toInt();
+  }
+
+  int _getEndTime() {
+    return ((_getBarEndPosition() + selectBarWidth) / (widthSlider / widget.duration)).ceilToDouble().toInt();
   }
 
   String _timeFormatter(int second) {
@@ -80,21 +99,15 @@ class WaveSliderState extends State<WaveSlider> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: widget.trimLoadedState.widthSlider - 5,
-      height: widget.trimLoadedState.heightSlider,
+      width: widthSlider - 5,
+      height: heightSlider,
       child: Column(
         children: [
           Row(
             children: [
-              Text(
-                  _timeFormatter(widget.trimCubit
-                      .getStartTime(duration: widget.duration, trimLoadedState: widget.trimLoadedState)),
-                  style: TextStyle(color: widget.positionTextColor)),
+              Text(_timeFormatter(_getStartTime()), style: TextStyle(color: widget.positionTextColor)),
               Expanded(child: Container()),
-              Text(
-                  _timeFormatter(
-                      widget.trimCubit.getEndTime(trimLoadedState: widget.trimLoadedState, duration: widget.duration)),
-                  style: TextStyle(color: widget.positionTextColor)),
+              Text(_timeFormatter(_getEndTime()), style: TextStyle(color: widget.positionTextColor)),
             ],
           ),
           Expanded(
@@ -105,61 +118,57 @@ class WaveSliderState extends State<WaveSlider> {
                 alignment: Alignment.centerLeft,
                 children: <Widget>[
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6.w),
-                    child: fixedBarViewer(
-                      musicListCubit: widget.musicListCubit,
-                      backgroundColor: widget.barBackgroundColor,
-                      barColor: widget.barColor,
-                    ),
+                    padding: EdgeInsets.all(6.h),
+                    child: flexbar(),
                   ),
                   cemterBar(
-                    horizontalBoxColor: widget.boxColor,
-                    position: widget.trimCubit.getBarStartPosition(trimLoadedState: widget.trimLoadedState) +
-                        widget.trimLoadedState.selectBarWidth,
-                    width: widget.trimCubit.getBarEndPosition(trimLoadedState: widget.trimLoadedState) -
-                        widget.trimCubit.getBarStartPosition(trimLoadedState: widget.trimLoadedState) -
-                        widget.trimLoadedState.selectBarWidth,
+                    position: _getBarStartPosition() + selectBarWidth,
+                    width: _getBarEndPosition() - _getBarStartPosition() - selectBarWidth,
                     callback: (details) {
-                      widget.trimCubit.drageMusic(trimLoadedState: widget.trimLoadedState, dx: details.delta.dx);
+                      var tmp1 = barStartPosition + details.delta.dx;
+                      var tmp2 = barEndPosition + details.delta.dx;
+                      if ((tmp1 > 0) && ((tmp2 + selectBarWidth) < widthSlider)) {
+                        setState(() {
+                          barStartPosition += details.delta.dx;
+                          barEndPosition += details.delta.dx;
+                        });
+                      }
                     },
                     callbackEnd: (details) {
-                      widget.callbackStart(widget.trimCubit
-                          .getStartTime(trimLoadedState: widget.trimLoadedState, duration: widget.duration)
-                          .toDouble());
+                      widget.callbackStart(_getStartTime().toDouble());
+                      widget.callbackEnd(_getEndTime().toDouble());
                     },
                   ),
                   bar(
-                    circleColor: widget.circleColor,
-                    position: widget.trimCubit.getBarStartPosition(trimLoadedState: widget.trimLoadedState),
-                    varticalBoxColor: widget.boxColor,
-                    width: widget.trimLoadedState.selectBarWidth,
+                    position: _getBarStartPosition(),
+                    colorBG: widget.sliderColor,
+                    width: selectBarWidth,
                     callback: (DragUpdateDetails details) {
-                      widget.trimCubit.changeBarStartPos(
-                        trimLoadedState: widget.trimLoadedState,
-                        dx: details.delta.dx,
-                      );
+                      var tmp = barStartPosition + details.delta.dx;
+                      if ((barEndPosition - selectBarWidth) > tmp && (tmp >= 0)) {
+                        setState(() {
+                          barStartPosition += details.delta.dx;
+                        });
+                      }
                     },
                     callbackEnd: (details) {
-                      widget.callbackStart(widget.trimCubit
-                          .getStartTime(trimLoadedState: widget.trimLoadedState, duration: widget.duration)
-                          .toDouble());
+                      widget.callbackStart(_getStartTime().toDouble());
                     },
                   ),
                   bar(
-                    circleColor: widget.circleColor,
-                    position: widget.trimCubit.getBarEndPosition(trimLoadedState: widget.trimLoadedState),
-                    varticalBoxColor: widget.boxColor,
-                    width: widget.trimLoadedState.selectBarWidth,
+                    position: _getBarEndPosition(),
+                    colorBG: widget.sliderColor,
+                    width: selectBarWidth,
                     callback: (DragUpdateDetails details) {
-                      widget.trimCubit.changeBarEndPos(
-                        trimLoadedState: widget.trimLoadedState,
-                        dx: details.delta.dx,
-                      );
+                      var tmp = barEndPosition + details.delta.dx;
+                      if ((barStartPosition + selectBarWidth) < tmp && (tmp + selectBarWidth) <= widthSlider) {
+                        setState(() {
+                          barEndPosition += details.delta.dx;
+                        });
+                      }
                     },
                     callbackEnd: (details) {
-                      widget.callbackEnd(widget.trimCubit
-                          .getEndTime(trimLoadedState: widget.trimLoadedState, duration: widget.duration)
-                          .toDouble());
+                      widget.callbackEnd(_getEndTime().toDouble());
                     },
                   ),
                 ],
@@ -173,8 +182,7 @@ class WaveSliderState extends State<WaveSlider> {
 
   Widget bar({
     double? position,
-    required Color varticalBoxColor,
-    required Color circleColor,
+    Color? colorBG,
     double? width,
     required GestureDragUpdateCallback callback,
     required GestureDragEndCallback? callbackEnd,
@@ -192,13 +200,14 @@ class WaveSliderState extends State<WaveSlider> {
                 child: Container(
                   height: double.infinity,
                   width: 4,
-                  color: varticalBoxColor,
+                  color: widget.barColor,
                 ),
               ),
               Container(
                 width: 16,
+                // color: Colors.amber,
                 alignment: Alignment.center,
-                child: Icon(Icons.circle, size: 16, color: circleColor),
+                child: Icon(Icons.circle, size: 16, color: widget.circleColor),
               ),
             ],
           ),
@@ -208,7 +217,6 @@ class WaveSliderState extends State<WaveSlider> {
   }
 
   Widget cemterBar({
-    required Color? horizontalBoxColor,
     double? position,
     double? width,
     GestureDragUpdateCallback? callback,
@@ -221,12 +229,13 @@ class WaveSliderState extends State<WaveSlider> {
         onHorizontalDragEnd: callbackEnd,
         child: Container(
           color: Colors.transparent,
+          // height: 200.0,
           width: width! + 16,
           child: Column(
             children: [
-              Container(height: 4, color: horizontalBoxColor),
+              Container(height: 4, color: widget.barColor),
               Expanded(child: Container()),
-              Container(height: 4, color: horizontalBoxColor),
+              Container(height: 4, color: widget.barColor),
             ],
           ),
         ),
@@ -234,18 +243,19 @@ class WaveSliderState extends State<WaveSlider> {
     );
   }
 
-  Widget fixedBarViewer({Color? backgroundColor, Color? barColor, required MusicListCubit musicListCubit}) {
+  Widget flexbar() {
     int i = 0;
     return Container(
       height: 50,
-      color: backgroundColor ?? Colors.white,
+      color: widget.barBackgroundColor,
+      width: double.infinity,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: musicListCubit.bars.map((int? height) {
+        children: widget.musicListCubit.bars.map((int? height) {
           i++;
           return Container(
-            color: barColor,
+            color: widget.barColor ?? Colors.black,
             height: height?.toDouble(),
             width: 1,
           );
